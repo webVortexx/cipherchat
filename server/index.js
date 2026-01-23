@@ -2,26 +2,13 @@ import express from "express";
 import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import dotenv from "dotenv";
-import uploadRoutes from "./routes/upload.routes.js";
-
-dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
 
-/* ---------- MIDDLEWARES ---------- */
 app.use(cors());
 app.use(express.json());
 
-/* ---------- ROUTES ---------- */
-app.get("/", (req, res) => {
-  res.send("Server is running...");
-});
-
-app.use("/upload", uploadRoutes);
-
-/* ---------- SOCKET.IO ---------- */
 const io = new Server(server, {
   cors: {
     origin: "*",
@@ -30,20 +17,32 @@ const io = new Server(server, {
 });
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+  console.log("✅ Socket connected:", socket.id);
 
-  socket.on("sendMessage", (message) => {
-    io.emit("receiveMessage", message);
+  socket.on("join_room", ({ username, room }) => {
+    console.log("➡️ join_room:", username, room);
+
+    socket.join(room);
+
+    io.in(room).emit("receive_message", {
+      author: "SYSTEM",
+      message: `${username} joined the room`,
+      time: new Date().toLocaleTimeString(),
+    });
+  });
+
+  socket.on("send_message", (data) => {
+    console.log("➡️ send_message:", data);
+
+    io.in(data.room).emit("receive_message", data);
   });
 
   socket.on("disconnect", () => {
-    console.log("User disconnected:", socket.id);
+    console.log("❌ Socket disconnected:", socket.id);
   });
 });
 
-/* ---------- SERVER LISTEN ---------- */
-const PORT = process.env.PORT || 5000;
-
+const PORT = 5000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
