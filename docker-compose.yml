@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: chat-server
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./server/.env
+    restart: always
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    container_name: chat-client
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server

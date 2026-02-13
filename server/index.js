@@ -37,6 +37,17 @@ io.on("connection", (socket) => {
     io.in(data.room).emit("receive_message", data);
   });
 
+  socket.on("join_room", ({ username, room }) => {
+  socket.join(room);
+
+  socket.to(room).emit("receive_message", {
+    author: "system",
+    message: `${username} joined the room`,
+    time: new Date().toLocaleTimeString(),
+  });
+});
+
+
   socket.on("disconnect", () => {
     console.log("❌ Socket disconnected:", socket.id);
   });

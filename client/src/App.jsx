@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import socket from "./socket/socket";
 
 function App() {
@@ -8,6 +8,9 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [joined, setJoined] = useState(false);
 
+  const messagesEndRef = useRef(null);
+
+  // Listen for messages
   useEffect(() => {
     socket.on("receive_message", (data) => {
       setMessages((prev) => [...prev, data]);
@@ -15,6 +18,11 @@ function App() {
 
     return () => socket.off("receive_message");
   }, []);
+
+  // Auto-scroll to bottom
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const joinRoom = () => {
     if (!username || !room) return alert("Fill all fields");
@@ -57,13 +65,36 @@ function App() {
         ) : (
           <>
             <div className="chat-box">
-              {messages.map((msg, i) => (
-                <div className="message" key={i}>
-                  <strong>{msg.author}</strong>: {msg.message}
-                  <span>{msg.time}</span>
-                </div>
-              ))}
-            </div>
+  {messages.map((msg, i) => {
+    if (msg.author === "system") {
+      return (
+        <div key={i} className="system-message">
+          {msg.message}
+        </div>
+      );
+    }
+
+    return (
+      <div
+        key={i}
+        className={`message ${
+          msg.author === username ? "my-message" : "other-message"
+        }`}
+      >
+        <div className="message-content">
+          <p>{msg.message}</p>
+          <span>{msg.time}</span>
+        </div>
+
+        {msg.author !== username && (
+          <div className="author">{msg.author}</div>
+        )}
+      </div>
+    );
+  })}
+</div>
+
+
 
             <div className="chat-input">
               <input
