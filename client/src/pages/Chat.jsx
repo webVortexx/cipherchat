@@ -10,16 +10,23 @@ function Chat() {
 
   const messagesEndRef = useRef(null);
 
-  // Receive messages
-  useEffect(() => {
-    socket.on("receive_message", (data) => {
-      setMessages((prev) => [...prev, data]);
-    });
+  // Load old messages + receive new messages
+useEffect(() => {
+  // Load chat history when joining
+  socket.on("load_messages", (data) => {
+    setMessages(data);
+  });
 
-    return () => {
-      socket.off("receive_message");
-    };
-  }, []);
+  // Receive new messages in real-time
+  socket.on("receive_message", (data) => {
+    setMessages((prev) => [...prev, data]);
+  });
+
+  return () => {
+    socket.off("load_messages");
+    socket.off("receive_message");
+  };
+}, []);
 
   // Auto scroll
   useEffect(() => {
