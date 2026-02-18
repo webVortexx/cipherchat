@@ -114,7 +114,7 @@ const getRandomColor = () =>
                 >
                   <div className="bubble">
                     <p style={{color:randomColor}}>{msg.author}</p>
-                    <br/>
+                    
                     <div className="message-text">
                       <p>{msg.content}</p>
                       <span>
