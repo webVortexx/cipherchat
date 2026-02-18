@@ -5,6 +5,7 @@ const messageSchema = new mongoose.Schema({
   room: String,
   author: String,
   content: String,
+  usercolor: String,
   type: {
     type: String,
     enum: ["text", "system"],

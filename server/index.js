@@ -74,18 +74,22 @@ io.on("connection", (socket) => {
   // =========================
   // SEND MESSAGE (TEXT + FILE)
   // =========================
-  socket.on("send_message", async (data) => {
-    const { room, author, content, messageType, fileUrl } = data;
 
-    if (!room || !author) return;
+  socket.on("send_message", async (data) => {
+  const { room, author, content, messageType = "text", fileUrl = null, usercolor } = data;
+
+  if (!room || !author) return;
+  if (messageType === "text" && !content) return;
+  if (messageType === "file" && !fileUrl) return;
 
     const message = {
       id: Date.now().toString(),
       room,
       author,
-      messageType: messageType || "text",
       content: content || null,
-      fileUrl: fileUrl || null,
+      fileUrl,
+      usercolor,
+      type: messageType,
       timestamp: Date.now(),
     };
 

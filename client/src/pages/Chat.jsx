@@ -8,24 +8,24 @@ function Chat() {
   const [messages, setMessages] = useState([]);
   const [joined, setJoined] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-
-  const [randomColor, setRandomColor] = useState(() =>
-    "#" +
-    Math.floor(Math.random() * 16777215)
-      .toString(16)
-      .padStart(6, "0")
-  );
+  const [userColor, setUserColor] = useState("#000000");
 
   const messagesEndRef = useRef(null);
 
-  const getRandomColor = () =>
-    "#" +
-    Math.floor(Math.random() * 16777215)
-      .toString(16)
-      .padStart(6, "0");
+  // =========================
+  // Generate color from username
+  // =========================
+  const getColorFromUsername = (username) => {
+    let hash = 0;
+    for (let i = 0; i < username.length; i++) {
+      hash = username.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const color = (hash & 0x00ffffff).toString(16).toUpperCase();
+    return "#" + "00000".substring(0, 6 - color.length) + color;
+  };
 
   // =========================
-  // Load old + new messages
+  // Load + receive messages
   // =========================
   useEffect(() => {
     socket.on("load_messages", (data) => {
@@ -47,7 +47,7 @@ function Chat() {
   // =========================
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, joined]);
+  }, [messages]);
 
   // =========================
   // Join room
@@ -57,11 +57,11 @@ function Chat() {
 
     socket.emit("join_room", { username, room });
     setJoined(true);
-    setRandomColor(getRandomColor());
+    setUserColor(getColorFromUsername(username));
   };
 
   // =========================
-  // Upload file to backend
+  // Upload file
   // =========================
   const handleFileUpload = async (file) => {
     const formData = new FormData();
@@ -77,10 +77,10 @@ function Chat() {
   };
 
   // =========================
-  // Send message (text OR file)
+  // Send message
   // =========================
   const sendMessage = async () => {
-    // Send file if selected
+    // FILE MESSAGE
     if (selectedFile) {
       const fileUrl = await handleFileUpload(selectedFile);
 
@@ -89,6 +89,7 @@ function Chat() {
         author: username,
         messageType: "file",
         fileUrl,
+        usercolor: userColor,
       });
 
       setSelectedFile(null);
@@ -96,6 +97,7 @@ function Chat() {
       return;
     }
 
+    // TEXT MESSAGE
     if (!message.trim()) return;
 
     socket.emit("send_message", {
@@ -103,142 +105,138 @@ function Chat() {
       author: username,
       messageType: "text",
       content: message,
+      usercolor: userColor,
     });
 
     setMessage("");
   };
 
   return (
-    <div className="chat-container">
+    <>
       <div className="chat-header">
         <h3>🔐 CipherChat</h3>
         <span>Room: {room}</span>
       </div>
 
-      {!joined ? (
-        <div className="join-box">
-          <input
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <input
-            placeholder="Room"
-            value={room}
-            onChange={(e) => setRoom(e.target.value)}
-          />
-          <button onClick={joinRoom}>Join Room</button>
+      <div className="chat-box row flex items-center justify-center pt-4">
+        {/* Groups Sidebar */}
+        <div className="chat-groups w-1/3">
+          <div>Groups panel</div>
         </div>
-      ) : (
-        <>
-          <div className="chat-messages">
-            {messages.map((msg, index) => {
-              if (msg.type === "system") {
-                return (
-                  <div key={index} className="system-message">
-                    {msg.content}
-                  </div>
-                );
-              }
 
-              return (
-                <div
-                  key={index}
-                  className={`chat-message ${
-                    msg.author === username
-                      ? "my-message"
-                      : "other-message"
-                  }`}
-                >
-                  <div className="bubble">
-                    <p style={{ color: randomColor }}>
-                      {msg.author}
-                    </p>
+        {/* Chat Container */}
+        <div className="chat-container w-2/3">
+          {!joined ? (
+            <div className="join-box">
+              <input
+                placeholder="Username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+              <input
+                placeholder="Room"
+                value={room}
+                onChange={(e) => setRoom(e.target.value)}
+              />
+              <button onClick={joinRoom}>Join Room</button>
+            </div>
+          ) : (
+            <>
+              {/* Messages */}
+              <div className="chat-messages">
+                {messages.map((msg) => {
+                  if (msg.type === "system") {
+                    return (
+                      <div key={msg.id} className="system-message">
+                        {msg.content}
+                      </div>
+                    );
+                  }
 
-                    <div className="message-text">
-                      {msg.messageType === "file" ? (
-                        <a
-                          href={msg.fileUrl}
-                          target="_blank"
-                          rel="noreferrer"
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`chat-message ${
+                        msg.author === username
+                          ? "my-message"
+                          : "other-message"
+                      }`}
+                    >
+                      <div className="bubble">
+                        <p
+                          style={{
+                            color:
+                              msg.usercolor ||
+                              getColorFromUsername(msg.author),
+                          }}
                         >
-                          📎 View File
-                        </a>
-                      ) : (
-                        <p>{msg.content}</p>
-                      )}
+                          {msg.author}
+                        </p>
 
-                      <span>
-                        {msg.timestamp &&
-                          new Date(msg.timestamp).toLocaleTimeString(
-                            [],
-                            {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            }
+                        <div className="message-text">
+                          {msg.messageType === "file" ? (
+                            <a href={msg.fileUrl} target="_blank" rel="noreferrer">
+                              📎 View File
+                            </a>
+                          ) : (
+                            <p>{msg.content}</p>
                           )}
-                      </span>
+
+                          <span>
+                            {msg.timestamp &&
+                              new Date(msg.timestamp).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                          </span>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
+              </div>
 
-          <div className="chat-input-area">
+              {/* Input Area */}
+              <div className="chat-input-area">
+                <input
+                  type="file"
+                  id="fileInput"
+                  style={{ display: "none" }}
+                  onChange={(e) => setSelectedFile(e.target.files[0])}
+                />
 
-            {/* Hidden File Input */}
-            <input
-              type="file"
-              id="fileInput"
-              style={{ display: "none" }}
-              onChange={(e) =>
-                setSelectedFile(e.target.files[0])
-              }
-            />
+                <button
+                  type="button"
+                  onClick={() =>
+                    document.getElementById("fileInput").click()
+                  }
+                >
+                  📎
+                </button>
 
-            {/* Attachment Icon */}
-            <button
-              type="button"
-              onClick={() =>
-                document.getElementById("fileInput").click()
-              }
-              style={{ marginRight: "6px" }}
-            >
-              📎
-            </button>
+                {selectedFile && (
+                  <span style={{ fontSize: "12px", marginRight: "8px" }}>
+                    {selectedFile.name}
+                  </span>
+                )}
 
-            {/* Show selected file name */}
-            {selectedFile && (
-              <span
-                style={{
-                  fontSize: "12px",
-                  marginRight: "8px",
-                }}
-              >
-                {selectedFile.name}
-              </span>
-            )}
+                <input
+                  placeholder="Type a message..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && sendMessage()
+                  }
+                />
 
-            {/* Text Input */}
-            <input
-              placeholder="Type a message..."
-              value={message}
-              onChange={(e) =>
-                setMessage(e.target.value)
-              }
-              onKeyDown={(e) =>
-                e.key === "Enter" && sendMessage()
-              }
-            />
-
-            {/* Send Button */}
-            <button onClick={sendMessage}>➤</button>
-          </div>
-        </>
-      )}
-    </div>
+                <button onClick={sendMessage}>➤</button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
