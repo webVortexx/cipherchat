@@ -7,11 +7,18 @@ function Chat() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [joined, setJoined] = useState(false);
+  const [randomColor, setRandomColor] = useState(() =>
+  "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"));
 
+
+
+  
   const messagesEndRef = useRef(null);
 
   // Load old messages + receive new messages
 useEffect(() => {
+  
+  
   // Load chat history when joining
   socket.on("load_messages", (data) => {
     setMessages(data);
@@ -26,12 +33,18 @@ useEffect(() => {
     socket.off("load_messages");
     socket.off("receive_message");
   };
-}, []);
+}, [joined]);
+const getRandomColor = () =>
+  "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0");
+
+
 
   // Auto scroll
   useEffect(() => {
+    
+     
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages,joined]);
 
   // Join room
   const joinRoom = () => {
@@ -39,6 +52,7 @@ useEffect(() => {
 
     socket.emit("join_room", { username, room });
     setJoined(true);
+    setRandomColor(getRandomColor());
   };
 
   // Send message
@@ -99,7 +113,7 @@ useEffect(() => {
                   }`}
                 >
                   <div className="bubble">
-                    <strong>{msg.author}</strong>
+                    <p style={{color:randomColor}}>{msg.author}</p>
                     <br/>
                     <div className="message-text">
                       <p>{msg.content}</p>

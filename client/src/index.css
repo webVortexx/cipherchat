@@ -97,9 +97,11 @@ body {
   flex-direction: column;
 }
 
+
+
 /* Header */
 .chat-header {
-  background: rgba(2, 6, 23, 0.9);
+  background: rgba(0, 3, 13, 0.9);
   padding: 15px 25px;
   display: flex;
   justify-content: space-between;
