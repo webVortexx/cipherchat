@@ -100,10 +100,14 @@ useEffect(() => {
                 >
                   <div className="bubble">
                     <strong>{msg.author}</strong>
-                    <p>{msg.content}</p>
-                    <span>
-                      {new Date(msg.timestamp).toLocaleTimeString()}
-                    </span>
+                    <br/>
+                    <div className="message-text">
+                      <p>{msg.content}</p>
+                      <span>
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
                   </div>
                 </div>
               );
