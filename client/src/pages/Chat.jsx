@@ -175,7 +175,11 @@ function Chat() {
 
                         <div className="message-text">
                           {msg.messageType === "file" ? (
-                            <a href={msg.fileUrl} target="_blank" rel="noreferrer">
+                            <a
+                              href={msg.fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
                               📎 View File
                             </a>
                           ) : (
