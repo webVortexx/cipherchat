@@ -202,7 +202,7 @@ body {
     background:  #2a292e;
     color: white;
     font-size: 14px;
-    box-shadow: 0 4px 20px rgba(37, 99, 235, 0.3);
+    box-shadow: 0 4px 20px #30520d;
     animation: fadeIn 0.2s ease-in-out;
 }
 
