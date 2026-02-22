@@ -12,9 +12,7 @@ function Chat() {
 
   const messagesEndRef = useRef(null);
 
-  // =========================
   // Generate color from username
-  // =========================
   const getColorFromUsername = (username) => {
     let hash = 0;
     for (let i = 0; i < username.length; i++) {
@@ -24,9 +22,7 @@ function Chat() {
     return "#" + "00000".substring(0, 6 - color.length) + color;
   };
 
-  // =========================
   // Load + receive messages
-  // =========================
   useEffect(() => {
     socket.on("load_messages", (data) => {
       setMessages(data);
@@ -42,16 +38,12 @@ function Chat() {
     };
   }, [joined]);
 
-  // =========================
   // Auto scroll
-  // =========================
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // =========================
   // Join room
-  // =========================
   const joinRoom = () => {
     if (!username || !room) return alert("Fill all fields");
 
@@ -60,9 +52,7 @@ function Chat() {
     setUserColor(getColorFromUsername(username));
   };
 
-  // =========================
   // Upload file
-  // =========================
   const handleFileUpload = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -76,11 +66,9 @@ function Chat() {
     return data.fileUrl;
   };
 
-  // =========================
   // Send message
-  // =========================
   const sendMessage = async () => {
-    // FILE MESSAGE
+    // File message
     if (selectedFile) {
       const fileUrl = await handleFileUpload(selectedFile);
 
@@ -97,7 +85,7 @@ function Chat() {
       return;
     }
 
-    // TEXT MESSAGE
+    // Text message
     if (!message.trim()) return;
 
     socket.emit("send_message", {
@@ -125,7 +113,7 @@ function Chat() {
         </div>
 
         {/* Chat Container */}
-        <div className="chat-container w-2/3">
+        <div className="chat-container flex w-2/3 items-center">
           {!joined ? (
             <div className="join-box">
               <input
@@ -210,14 +198,7 @@ function Chat() {
                   onChange={(e) => setSelectedFile(e.target.files[0])}
                 />
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    document.getElementById("fileInput").click()
-                  }
-                >
-                  📎
-                </button>
+
 
                 {selectedFile && (
                   <span style={{ fontSize: "12px", marginRight: "8px" }}>
@@ -233,6 +214,14 @@ function Chat() {
                     e.key === "Enter" && sendMessage()
                   }
                 />
+                                <button
+                  type="button"
+                  onClick={() =>
+                    document.getElementById("fileInput").click()
+                  }
+                >
+                  📎
+                </button>
 
                 <button onClick={sendMessage}>➤</button>
               </div>

@@ -5,10 +5,11 @@ const messageSchema = new mongoose.Schema({
   room: String,
   author: String,
   content: String,
+  fileUrl: String,
   usercolor: String,
   type: {
     type: String,
-    enum: ["text", "system"],
+    enum: ["text", "file", "system"],
     default: "text",
   },
   timestamp: Number,
