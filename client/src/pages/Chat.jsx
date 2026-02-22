@@ -7,46 +7,51 @@ function Chat() {
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [joined, setJoined] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+
   const [randomColor, setRandomColor] = useState(() =>
-  "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0"));
+    "#" +
+    Math.floor(Math.random() * 16777215)
+      .toString(16)
+      .padStart(6, "0")
+  );
 
-
-
-  
   const messagesEndRef = useRef(null);
 
-  // Load old messages + receive new messages
-useEffect(() => {
-  
-  
-  // Load chat history when joining
-  socket.on("load_messages", (data) => {
-    setMessages(data);
-  });
+  const getRandomColor = () =>
+    "#" +
+    Math.floor(Math.random() * 16777215)
+      .toString(16)
+      .padStart(6, "0");
 
-  // Receive new messages in real-time
-  socket.on("receive_message", (data) => {
-    setMessages((prev) => [...prev, data]);
-  });
-
-  return () => {
-    socket.off("load_messages");
-    socket.off("receive_message");
-  };
-}, [joined]);
-const getRandomColor = () =>
-  "#" + Math.floor(Math.random() * 16777215).toString(16).padStart(6, "0");
-
-
-
-  // Auto scroll
+  // =========================
+  // Load old + new messages
+  // =========================
   useEffect(() => {
-    
-     
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages,joined]);
+    socket.on("load_messages", (data) => {
+      setMessages(data);
+    });
 
+    socket.on("receive_message", (data) => {
+      setMessages((prev) => [...prev, data]);
+    });
+
+    return () => {
+      socket.off("load_messages");
+      socket.off("receive_message");
+    };
+  }, [joined]);
+
+  // =========================
+  // Auto scroll
+  // =========================
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, joined]);
+
+  // =========================
   // Join room
+  // =========================
   const joinRoom = () => {
     if (!username || !room) return alert("Fill all fields");
 
@@ -55,13 +60,48 @@ const getRandomColor = () =>
     setRandomColor(getRandomColor());
   };
 
-  // Send message
-  const sendMessage = () => {
+  // =========================
+  // Upload file to backend
+  // =========================
+  const handleFileUpload = async (file) => {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("http://localhost:5000/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+    return data.fileUrl;
+  };
+
+  // =========================
+  // Send message (text OR file)
+  // =========================
+  const sendMessage = async () => {
+    // Send file if selected
+    if (selectedFile) {
+      const fileUrl = await handleFileUpload(selectedFile);
+
+      socket.emit("send_message", {
+        room,
+        author: username,
+        messageType: "file",
+        fileUrl,
+      });
+
+      setSelectedFile(null);
+      document.getElementById("fileInput").value = "";
+      return;
+    }
+
     if (!message.trim()) return;
 
     socket.emit("send_message", {
       room,
       author: username,
+      messageType: "text",
       content: message,
     });
 
@@ -92,20 +132,18 @@ const getRandomColor = () =>
       ) : (
         <>
           <div className="chat-messages">
-            {messages.map((msg) => {
-              // System Message
+            {messages.map((msg, index) => {
               if (msg.type === "system") {
                 return (
-                  <div key={msg.id} className="system-message">
+                  <div key={index} className="system-message">
                     {msg.content}
                   </div>
                 );
               }
 
-              // Normal Message
               return (
                 <div
-                  key={msg.id}
+                  key={index}
                   className={`chat-message ${
                     msg.author === username
                       ? "my-message"
@@ -113,15 +151,34 @@ const getRandomColor = () =>
                   }`}
                 >
                   <div className="bubble">
-                    <p style={{color:randomColor}}>{msg.author}</p>
-                    
+                    <p style={{ color: randomColor }}>
+                      {msg.author}
+                    </p>
+
                     <div className="message-text">
-                      <p>{msg.content}</p>
+                      {msg.messageType === "file" ? (
+                        <a
+                          href={msg.fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          📎 View File
+                        </a>
+                      ) : (
+                        <p>{msg.content}</p>
+                      )}
+
                       <span>
-                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {msg.timestamp &&
+                          new Date(msg.timestamp).toLocaleTimeString(
+                            [],
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            }
+                          )}
                       </span>
                     </div>
-
                   </div>
                 </div>
               );
@@ -130,14 +187,53 @@ const getRandomColor = () =>
           </div>
 
           <div className="chat-input-area">
+
+            {/* Hidden File Input */}
+            <input
+              type="file"
+              id="fileInput"
+              style={{ display: "none" }}
+              onChange={(e) =>
+                setSelectedFile(e.target.files[0])
+              }
+            />
+
+            {/* Attachment Icon */}
+            <button
+              type="button"
+              onClick={() =>
+                document.getElementById("fileInput").click()
+              }
+              style={{ marginRight: "6px" }}
+            >
+              📎
+            </button>
+
+            {/* Show selected file name */}
+            {selectedFile && (
+              <span
+                style={{
+                  fontSize: "12px",
+                  marginRight: "8px",
+                }}
+              >
+                {selectedFile.name}
+              </span>
+            )}
+
+            {/* Text Input */}
             <input
               placeholder="Type a message..."
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) =>
+                setMessage(e.target.value)
+              }
               onKeyDown={(e) =>
                 e.key === "Enter" && sendMessage()
               }
             />
+
+            {/* Send Button */}
             <button onClick={sendMessage}>➤</button>
           </div>
         </>

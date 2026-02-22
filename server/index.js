@@ -5,14 +5,14 @@ import cors from "cors";
 import { randomUUID } from "crypto";
 import mongoose from "mongoose";
 import Message from "./models/Message.js";
-
-
+import uploadRoutes from "./routes/upload.routes.js";
 
 const app = express();
 const server = http.createServer(app);
 
 app.use(cors());
 app.use(express.json());
+app.use("/api", uploadRoutes);
 
 const io = new Server(server, {
   cors: {
@@ -21,17 +21,22 @@ const io = new Server(server, {
   },
 });
 
-// Optional: Track connected users
-
-
+// Track connected users
 const onlineUsers = {};
-mongoose.connect(
-  "mongodb+srv://cipherchatadmin:cipherchatadmin@cluster0.6tiltr1.mongodb.net/cipherchat?retryWrites=true&w=majority&appName=Cluster0"
-)
-.then(() => console.log("MongoDB Atlas Connected"))
-.catch(err => console.log(err));
 
+// =========================
+// MONGODB CONNECTION
+// =========================
+mongoose
+  .connect(
+    "mongodb+srv://cipherchatadmin:cipherchatadmin@cluster0.6tiltr1.mongodb.net/cipherchat?retryWrites=true&w=majority&appName=Cluster0"
+  )
+  .then(() => console.log("MongoDB Atlas Connected"))
+  .catch((err) => console.log(err));
 
+// =========================
+// SOCKET CONNECTION
+// =========================
 io.on("connection", (socket) => {
   console.log("✅ Socket connected:", socket.id);
 
@@ -39,61 +44,64 @@ io.on("connection", (socket) => {
   // JOIN ROOM
   // =========================
   socket.on("join_room", async ({ username, room }) => {
-  if (!username || !room) return;
+    if (!username || !room) return;
 
-  socket.join(room);
+    socket.join(room);
 
-  const systemMessage = {
-    id: Date.now().toString(),
-    room,
-    author: "SYSTEM",
-    content: `${username} joined the room`,
-    type: "system",
-    timestamp: Date.now(),
-  };
+    onlineUsers[socket.id] = { username, room };
 
-  await Message.create(systemMessage);
+    const systemMessage = {
+      id: Date.now().toString(),
+      room,
+      author: "SYSTEM",
+      content: `${username} joined the room`,
+      type: "system",
+      timestamp: Date.now(),
+    };
 
-  socket.to(room).emit("receive_message", systemMessage);
+    await Message.create(systemMessage);
 
-  // 🔥 Load previous messages
-  const previousMessages = await Message
-    .find({ room })
-    .sort({ createdAt: 1 });
+    socket.to(room).emit("receive_message", systemMessage);
 
-  socket.emit("load_messages", previousMessages);
-});
+    // Load previous messages
+    const previousMessages = await Message.find({ room }).sort({
+      timestamp: 1,
+    });
 
+    socket.emit("load_messages", previousMessages);
+  });
 
   // =========================
-  // SEND MESSAGE
+  // SEND MESSAGE (TEXT + FILE)
   // =========================
-  socket.on("send_message", async ({ room, author, content }) => {
-  if (!room || !author || !content) return;
+  socket.on("send_message", async (data) => {
+    const { room, author, content, messageType, fileUrl } = data;
 
-  const message = {
-    id: Date.now().toString(),
-    room,
-    author,
-    content,
-    type: "text",
-    timestamp: Date.now(),
-  };
+    if (!room || !author) return;
 
-  try {
-    const savedMessage = await Message.create(message);
+    const message = {
+      id: Date.now().toString(),
+      room,
+      author,
+      messageType: messageType || "text",
+      content: content || null,
+      fileUrl: fileUrl || null,
+      timestamp: Date.now(),
+    };
 
-    io.to(room).emit("receive_message", savedMessage);
-  } catch (err) {
-    console.error("DB Save Error:", err);
-  }
-});
+    try {
+      const savedMessage = await Message.create(message);
 
+      io.to(room).emit("receive_message", savedMessage);
+    } catch (err) {
+      console.error("DB Save Error:", err);
+    }
+  });
 
   // =========================
   // DISCONNECT
   // =========================
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     const user = onlineUsers[socket.id];
 
     if (user) {
@@ -105,6 +113,8 @@ io.on("connection", (socket) => {
         type: "system",
         timestamp: Date.now(),
       };
+
+      await Message.create(leaveMessage);
 
       socket.to(user.room).emit("receive_message", leaveMessage);
 
