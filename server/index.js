@@ -83,7 +83,16 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send_message", async (data) => {
-    const { room, author, content, messageType = "text", fileUrl = null, usercolor } = data;
+    const { 
+      room, 
+      author, 
+      content, 
+      messageType = "text", 
+      fileUrl = null, 
+      usercolor,
+      fileName = null,
+      fileSize = null
+    } = data;
 
     if (!room || !author) return;
     if (messageType === "text" && !content) return;
@@ -94,6 +103,8 @@ io.on("connection", (socket) => {
       room,
       author,
       content: content || null,
+      fileName: fileName || null,
+      fileSize: fileSize || null,
       fileUrl,
       usercolor,
       type: messageType,

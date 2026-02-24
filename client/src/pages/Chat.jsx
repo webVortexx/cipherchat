@@ -10,6 +10,8 @@ function Chat() {
   const [selectedFile, setSelectedFile] = useState(null);
   const [userColor, setUserColor] = useState("#000000");
   const [groups, setGroups] = useState([]);
+  const [notification, setNotification] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -23,6 +25,14 @@ function Chat() {
     return `hsl(${hue}, 70%, 60%)`;
   };
 
+  // Show notification
+  const showNotification = (message, type = "success") => {
+    setNotification({ message, type });
+    setTimeout(() => {
+      setNotification(null);
+    }, 3000);
+  };
+
   const fetchGroups = async () => {
     try {
       const response = await fetch("http://localhost:5000/api/groups");
@@ -30,6 +40,7 @@ function Chat() {
       setGroups(data);
     } catch (error) {
       console.error("Error fetching groups:", error);
+      showNotification("Failed to load groups", "error");
     }
   };
 
@@ -81,7 +92,13 @@ function Chat() {
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        showNotification("File size exceeds 10MB limit", "error");
+        return;
+      }
       setSelectedFile(file);
+      showNotification(`File selected: ${file.name}`, "info");
     }
   };
 
@@ -89,6 +106,8 @@ function Chat() {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("room", room);
+
+    setUploading(true);
 
     try {
       const response = await fetch("http://localhost:5000/api/upload", {
@@ -101,15 +120,22 @@ function Chat() {
         socket.emit("send_message", {
           room,
           author: username,
-          content: null,
+          content: file.name,
+          fileName: file.name,
+          fileSize: (file.size / 1024).toFixed(2), // KB
           messageType: "file",
           fileUrl: data.fileUrl,
           usercolor: userColor,
         });
+        
         setSelectedFile(null);
+        showNotification(`✅ Document uploaded successfully: ${file.name}`, "success");
       }
     } catch (error) {
       console.error("Upload error:", error);
+      showNotification("Failed to upload file", "error");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -185,6 +211,13 @@ function Chat() {
 
   return (
     <div className="chat-layout">
+      {/* Notification */}
+      {notification && (
+        <div className={`notification notification-${notification.type}`}>
+          {notification.message}
+        </div>
+      )}
+
       {/* Sidebar */}
       <div className="sidebar">
         <div className="sidebar-header">
@@ -234,15 +267,27 @@ function Chat() {
                     {msg.author === username ? "You" : msg.author}
                   </p>
                   {msg.messageType === "file" ? (
-                    <div className="message-text">
-                      <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">
-                        📎 Download File
+                    <div className="file-message">
+                      <div className="file-info">
+                        <span className="file-icon">📄</span>
+                        <div className="file-details">
+                          <p className="file-name">{msg.fileName || msg.content}</p>
+                          <span className="file-size">{msg.fileSize || "0"} KB</span>
+                        </div>
+                      </div>
+                      <a 
+                        href={msg.fileUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="download-btn"
+                      >
+                        ⬇️ Download
                       </a>
                     </div>
                   ) : (
-                    <div>{msg.content}</div>
+                    <div className="message-content">{msg.content}</div>
                   )}
-                  <span>
+                  <span className="message-time">
                     {new Date(msg.timestamp).toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
@@ -272,22 +317,25 @@ function Chat() {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyPress={handleKeyPress}
+              disabled={uploading}
             />
 
             <button
               className="btn-upload"
               onClick={() => fileInputRef.current?.click()}
               title="Upload File"
+              disabled={uploading}
             >
               📎
             </button>
 
             <button
-              className="btn-send"
+              className={`btn-send ${uploading ? "uploading" : ""}`}
               onClick={sendMessage}
               title="Send Message"
+              disabled={uploading}
             >
-              ✈️
+              {uploading ? "⏳" : "✈️"}
             </button>
           </div>
         </div>
