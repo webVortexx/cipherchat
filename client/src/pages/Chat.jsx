@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import socket from "../socket/socket";
 
 function Chat() {
@@ -9,227 +9,290 @@ function Chat() {
   const [joined, setJoined] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [userColor, setUserColor] = useState("#000000");
+  const [groups, setGroups] = useState([]);
 
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  // Generate color from username
   const getColorFromUsername = (username) => {
     let hash = 0;
     for (let i = 0; i < username.length; i++) {
       hash = username.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const color = (hash & 0x00ffffff).toString(16).toUpperCase();
-    return "#" + "00000".substring(0, 6 - color.length) + color;
+    const hue = hash % 360;
+    return `hsl(${hue}, 70%, 60%)`;
   };
 
-  // Load + receive messages
+  const fetchGroups = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/groups");
+      const data = await response.json();
+      setGroups(data);
+    } catch (error) {
+      console.error("Error fetching groups:", error);
+    }
+  };
+
   useEffect(() => {
-    socket.on("load_messages", (data) => {
-      setMessages(data);
-    });
+    fetchGroups();
+  }, []);
 
-    socket.on("receive_message", (data) => {
-      setMessages((prev) => [...prev, data]);
-    });
+  useEffect(() => {
+    if (joined) {
+      socket.on("load_messages", (data) => {
+        setMessages(data);
+      });
 
-    return () => {
-      socket.off("load_messages");
-      socket.off("receive_message");
-    };
+      socket.on("receive_message", (data) => {
+        setMessages((prev) => [...prev, data]);
+      });
+
+      return () => {
+        socket.off("load_messages");
+        socket.off("receive_message");
+      };
+    }
   }, [joined]);
 
-  // Auto scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Join room
   const joinRoom = () => {
-    if (!username || !room) return alert("Fill all fields");
-
-    socket.emit("join_room", { username, room });
-    setJoined(true);
-    setUserColor(getColorFromUsername(username));
+    if (username.trim() && room.trim()) {
+      const color = getColorFromUsername(username);
+      setUserColor(color);
+      socket.emit("join_room", { username, room });
+      setJoined(true);
+      fetchGroups();
+    }
   };
 
-  // Upload file
+  const joinGroupFromSidebar = (groupName) => {
+    if (!joined) {
+      alert("Please join a room first or login");
+      return;
+    }
+    setRoom(groupName);
+    socket.emit("join_room", { username, room: groupName });
+    setMessages([]);
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
   const handleFileUpload = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("room", room);
 
-    const res = await fetch("http://localhost:5000/api/upload", {
-      method: "POST",
-      body: formData,
-    });
+    try {
+      const response = await fetch("http://localhost:5000/api/upload", {
+        method: "POST",
+        body: formData,
+      });
 
-    const data = await res.json();
-    return data.fileUrl;
+      const data = await response.json();
+      if (data.fileUrl) {
+        socket.emit("send_message", {
+          room,
+          author: username,
+          content: null,
+          messageType: "file",
+          fileUrl: data.fileUrl,
+          usercolor: userColor,
+        });
+        setSelectedFile(null);
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+    }
   };
 
-  // Send message
   const sendMessage = async () => {
-    // File message
     if (selectedFile) {
-      const fileUrl = await handleFileUpload(selectedFile);
-
+      await handleFileUpload(selectedFile);
+      setMessage("");
+    } else if (message.trim()) {
       socket.emit("send_message", {
         room,
         author: username,
-        messageType: "file",
-        fileUrl,
+        content: message,
+        messageType: "text",
         usercolor: userColor,
       });
-
-      setSelectedFile(null);
-      document.getElementById("fileInput").value = "";
-      return;
+      setMessage("");
     }
-
-    // Text message
-    if (!message.trim()) return;
-
-    socket.emit("send_message", {
-      room,
-      author: username,
-      messageType: "text",
-      content: message,
-      usercolor: userColor,
-    });
-
-    setMessage("");
   };
 
-  return (
-    <>
-      <div className="chat-header">
-        <h3>🔐 CipherChat</h3>
-        <span>Room: {room}</span>
-      </div>
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
 
-      <div className="chat-box row flex items-center justify-center pt-4">
-        {/* Groups Sidebar */}
-        <div className="chat-groups w-1/3">
-          <div>Groups panel</div>
+  if (!joined) {
+    return (
+      <div className="chat-container">
+        <div className="join-box">
+          <h2>Join Chat Room</h2>
+          <input
+            type="text"
+            placeholder="Enter your username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && joinRoom()}
+          />
+          <input
+            type="text"
+            placeholder="Enter or create room name"
+            value={room}
+            onChange={(e) => setRoom(e.target.value)}
+            onKeyPress={(e) => e.key === "Enter" && joinRoom()}
+          />
+          <button onClick={joinRoom}>Join Room</button>
+
+          <div className="groups-preview">
+            <h3>Available Groups</h3>
+            <div className="groups-list-preview">
+              {groups.length > 0 ? (
+                groups.map((group) => (
+                  <div
+                    key={group._id}
+                    className="group-item-preview"
+                    onClick={() => {
+                      setRoom(group.name);
+                    }}
+                  >
+                    <span className="group-name">{group.name}</span>
+                    <span className="group-members">{group.members.length} members</span>
+                  </div>
+                ))
+              ) : (
+                <p className="no-groups">No groups yet</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="chat-layout">
+      {/* Sidebar */}
+      <div className="sidebar">
+        <div className="sidebar-header">
+          <h2>💬 Groups</h2>
         </div>
 
-        {/* Chat Container */}
-        <div className="chat-container flex w-2/3 items-center">
-          {!joined ? (
-            <div className="join-box">
-              <input
-                placeholder="Username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-              <input
-                placeholder="Room"
-                value={room}
-                onChange={(e) => setRoom(e.target.value)}
-              />
-              <button onClick={joinRoom}>Join Room</button>
-            </div>
+        <div className="groups-list">
+          {groups.length > 0 ? (
+            groups.map((group) => (
+              <div
+                key={group._id}
+                className={`group-item ${room === group.name ? "active" : ""}`}
+                onClick={() => joinGroupFromSidebar(group.name)}
+              >
+                <div className="group-info">
+                  <p className="group-name">{group.name}</p>
+                  <span className="group-meta">{group.members.length} members</span>
+                </div>
+              </div>
+            ))
           ) : (
-            <>
-              {/* Messages */}
-              <div className="chat-messages">
-                {messages.map((msg) => {
-                  if (msg.type === "system") {
-                    return (
-                      <div key={msg.id} className="system-message">
-                        {msg.content}
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`chat-message ${
-                        msg.author === username
-                          ? "my-message"
-                          : "other-message"
-                      }`}
-                    >
-                      <div className="bubble">
-                        <p
-                          style={{
-                            color:
-                              msg.usercolor ||
-                              getColorFromUsername(msg.author),
-                          }}
-                        >
-                          {msg.author}
-                        </p>
-
-                        <div className="message-text">
-                          {msg.messageType === "file" ? (
-                            <a
-                              href={msg.fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              📎 View File
-                            </a>
-                          ) : (
-                            <p>{msg.content}</p>
-                          )}
-
-                          <span>
-                            {msg.timestamp &&
-                              new Date(msg.timestamp).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Input Area */}
-              <div className="chat-input-area">
-                <input
-                  type="file"
-                  id="fileInput"
-                  style={{ display: "none" }}
-                  onChange={(e) => setSelectedFile(e.target.files[0])}
-                />
-
-
-
-                {selectedFile && (
-                  <span style={{ fontSize: "12px", marginRight: "8px" }}>
-                    {selectedFile.name}
-                  </span>
-                )}
-
-                <input
-                  placeholder="Type a message..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && sendMessage()
-                  }
-                />
-                                <button
-                  type="button"
-                  onClick={() =>
-                    document.getElementById("fileInput").click()
-                  }
-                >
-                  📎
-                </button>
-
-                <button onClick={sendMessage}>➤</button>
-              </div>
-            </>
+            <p className="no-groups">No groups available</p>
           )}
         </div>
       </div>
-    </>
+
+      {/* Main Chat Area */}
+      <div className="chat-wrapper">
+        <div className="chat-header">
+          <h3>💬 {room}</h3>
+          <span>Welcome, {username}</span>
+        </div>
+
+        <div className="chat-messages">
+          {messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`chat-message ${
+                msg.author === username ? "my-message" : "other-message"
+              }`}
+            >
+              {msg.type === "system" ? (
+                <div className="system-message">{msg.content}</div>
+              ) : (
+                <div className="bubble">
+                  <p style={{ color: msg.usercolor }}>
+                    {msg.author === username ? "You" : msg.author}
+                  </p>
+                  {msg.messageType === "file" ? (
+                    <div className="message-text">
+                      <a href={msg.fileUrl} target="_blank" rel="noopener noreferrer">
+                        📎 Download File
+                      </a>
+                    </div>
+                  ) : (
+                    <div>{msg.content}</div>
+                  )}
+                  <span>
+                    {new Date(msg.timestamp).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input Section */}
+        <div className="input-footer">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileSelect}
+            style={{ display: "none" }}
+          />
+
+          <div className="input-container">
+            <input
+              type="text"
+              className="message-input"
+              placeholder={selectedFile ? `Selected: ${selectedFile.name}` : "Type a message..."}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+            />
+
+            <button
+              className="btn-upload"
+              onClick={() => fileInputRef.current?.click()}
+              title="Upload File"
+            >
+              📎
+            </button>
+
+            <button
+              className="btn-send"
+              onClick={sendMessage}
+              title="Send Message"
+            >
+              ✈️
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
