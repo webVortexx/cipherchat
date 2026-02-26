@@ -1,0 +1,30 @@
+function ChatHeader({ room, joined, activeGroup, username, openSidebar }) {
+  return (
+    <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 md:px-6">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={openSidebar}
+          className="rounded-md border border-gray-200 p-2 text-gray-600 transition-all duration-200 ease-in-out hover:bg-gray-100 md:hidden"
+          aria-label="Open sidebar"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div>
+          <p className="text-sm font-medium text-gray-900">{room || "Select a chat"}</p>
+          <p className="flex items-center gap-2 text-xs text-gray-400">
+            <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+            {joined
+              ? `${activeGroup?.members?.length || 1} members online`
+              : "Not in a room"}
+          </p>
+        </div>
+      </div>
+      <p className="text-xs text-gray-400">{username}</p>
+    </header>
+  );
+}
+
+export default ChatHeader;
