@@ -1,345 +1,419 @@
-import { useState, useRef, useEffect } from "react";
-import socket from "../socket/socket";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import API from "../api/axios";
+import socket, { connectSocketWithAuth } from "../socket/socket";
+import { clearAuthSession, getAuthUser } from "../auth/auth";
 
 function Chat() {
-  const [username, setUsername] = useState("");
   const [room, setRoom] = useState("");
+  const [roomDraft, setRoomDraft] = useState("");
+  const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState([]);
   const [joined, setJoined] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [userColor, setUserColor] = useState("#000000");
+  const [userColor, setUserColor] = useState("#4f46e5");
   const [groups, setGroups] = useState([]);
   const [notification, setNotification] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const navigate = useNavigate();
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
+  const authUser = getAuthUser();
+  const username = authUser?.username || "";
 
-  const getColorFromUsername = (username) => {
+  const getColorFromUsername = (name) => {
     let hash = 0;
-    for (let i = 0; i < username.length; i++) {
-      hash = username.charCodeAt(i) + ((hash << 5) - hash);
+    for (let i = 0; i < name.length; i += 1) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
     }
-    const hue = hash % 360;
-    return `hsl(${hue}, 70%, 60%)`;
+    const hue = Math.abs(hash % 360);
+    return `hsl(${hue}, 70%, 45%)`;
   };
 
-  // Show notification
-  const showNotification = (message, type = "success") => {
-    setNotification({ message, type });
+  const showNotification = (text, type = "success") => {
+    setNotification({ message: text, type });
     setTimeout(() => {
       setNotification(null);
-    }, 3000);
+    }, 2500);
   };
 
-  const fetchGroups = async () => {
+  const handleUnauthorized = useCallback(() => {
+    clearAuthSession();
+    socket.disconnect();
+    navigate("/", { replace: true });
+  }, [navigate]);
+
+  const fetchGroups = useCallback(async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/groups");
-      const data = await response.json();
-      setGroups(data);
+      const response = await API.get("/api/groups");
+      setGroups(response.data);
     } catch (error) {
-      console.error("Error fetching groups:", error);
-      showNotification("Failed to load groups", "error");
+      if (error.response?.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+      showNotification("Failed to load chat list", "error");
     }
-  };
+  }, [handleUnauthorized]);
 
   useEffect(() => {
+    if (!authUser) {
+      navigate("/", { replace: true });
+      return;
+    }
+
+    setUserColor(getColorFromUsername(username));
     fetchGroups();
-  }, []);
+  }, [authUser, fetchGroups, navigate, username]);
 
   useEffect(() => {
-    if (joined) {
-      socket.on("load_messages", (data) => {
-        setMessages(data);
-      });
+    const onLoadMessages = (data) => {
+      setMessages(data);
+    };
+    const onReceiveMessage = (data) => {
+      setMessages((prev) => [...prev, data]);
+    };
+    const onConnectError = (err) => {
+      if (err.message === "Unauthorized" || err.message === "Invalid token") {
+        handleUnauthorized();
+      }
+    };
 
-      socket.on("receive_message", (data) => {
-        setMessages((prev) => [...prev, data]);
-      });
+    socket.on("load_messages", onLoadMessages);
+    socket.on("receive_message", onReceiveMessage);
+    socket.on("connect_error", onConnectError);
 
-      return () => {
-        socket.off("load_messages");
-        socket.off("receive_message");
-      };
-    }
-  }, [joined]);
+    return () => {
+      socket.off("load_messages", onLoadMessages);
+      socket.off("receive_message", onReceiveMessage);
+      socket.off("connect_error", onConnectError);
+    };
+  }, [handleUnauthorized]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  const joinRoom = () => {
-    if (username.trim() && room.trim()) {
-      const color = getColorFromUsername(username);
-      setUserColor(color);
-      socket.emit("join_room", { username, room });
-      setJoined(true);
-      fetchGroups();
-    }
-  };
+  const filteredGroups = useMemo(
+    () =>
+      groups.filter((group) =>
+        group.name.toLowerCase().includes(search.trim().toLowerCase())
+      ),
+    [groups, search]
+  );
 
-  const joinGroupFromSidebar = (groupName) => {
-    if (!joined) {
-      alert("Please join a room first or login");
-      return;
-    }
-    setRoom(groupName);
-    socket.emit("join_room", { username, room: groupName });
+  const joinRoom = async (targetRoom = roomDraft) => {
+    const nextRoom = targetRoom.trim();
+    if (!nextRoom) return;
+
+    connectSocketWithAuth();
+    socket.emit("join_room", { room: nextRoom });
+    setRoom(nextRoom);
+    setJoined(true);
     setMessages([]);
+    setRoomDraft("");
+    setSidebarOpen(false);
+    await fetchGroups();
   };
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
-    if (file) {
-      const maxSize = 10 * 1024 * 1024; // 10MB
-      if (file.size > maxSize) {
-        showNotification("File size exceeds 10MB limit", "error");
-        return;
-      }
-      setSelectedFile(file);
-      showNotification(`File selected: ${file.name}`, "info");
+    if (!file) return;
+
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      showNotification("File size exceeds 10MB limit", "error");
+      return;
     }
+
+    setSelectedFile(file);
+    showNotification(`Selected: ${file.name}`, "info");
   };
 
   const handleFileUpload = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("room", room);
-
     setUploading(true);
 
     try {
-      const response = await fetch("http://localhost:5000/api/upload", {
-        method: "POST",
-        body: formData,
+      const response = await API.post("/api/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
-      const data = await response.json();
-      if (data.fileUrl) {
+      if (response.data.fileUrl) {
         socket.emit("send_message", {
           room,
-          author: username,
           content: file.name,
           fileName: file.name,
-          fileSize: (file.size / 1024).toFixed(2), // KB
+          fileSize: (file.size / 1024).toFixed(2),
           messageType: "file",
-          fileUrl: data.fileUrl,
+          fileUrl: response.data.fileUrl,
           usercolor: userColor,
         });
-        
+
         setSelectedFile(null);
-        showNotification(`✅ Document uploaded successfully: ${file.name}`, "success");
+        showNotification("File sent", "success");
       }
     } catch (error) {
-      console.error("Upload error:", error);
-      showNotification("Failed to upload file", "error");
+      if (error.response?.status === 401) {
+        handleUnauthorized();
+        return;
+      }
+      showNotification("Upload failed", "error");
     } finally {
       setUploading(false);
     }
   };
 
   const sendMessage = async () => {
+    if (!joined || !room) {
+      showNotification("Join a chat first", "error");
+      return;
+    }
+
     if (selectedFile) {
       await handleFileUpload(selectedFile);
       setMessage("");
-    } else if (message.trim()) {
-      socket.emit("send_message", {
-        room,
-        author: username,
-        content: message,
-        messageType: "text",
-        usercolor: userColor,
-      });
-      setMessage("");
+      return;
     }
+
+    if (!message.trim()) return;
+    socket.emit("send_message", {
+      room,
+      content: message,
+      messageType: "text",
+      usercolor: userColor,
+    });
+    setMessage("");
   };
 
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+  const handleLogout = () => {
+    clearAuthSession();
+    socket.disconnect();
+    navigate("/", { replace: true });
   };
-
-  if (!joined) {
-    return (
-      <div className="chat-container">
-        <div className="join-box">
-          <h2>Join Chat Room</h2>
-          <input
-            type="text"
-            placeholder="Enter your username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && joinRoom()}
-          />
-          <input
-            type="text"
-            placeholder="Enter or create room name"
-            value={room}
-            onChange={(e) => setRoom(e.target.value)}
-            onKeyPress={(e) => e.key === "Enter" && joinRoom()}
-          />
-          <button onClick={joinRoom}>Join Room</button>
-
-          <div className="groups-preview">
-            <h3>Available Groups</h3>
-            <div className="groups-list-preview">
-              {groups.length > 0 ? (
-                groups.map((group) => (
-                  <div
-                    key={group._id}
-                    className="group-item-preview"
-                    onClick={() => {
-                      setRoom(group.name);
-                    }}
-                  >
-                    <span className="group-name">{group.name}</span>
-                    <span className="group-members">{group.members.length} members</span>
-                  </div>
-                ))
-              ) : (
-                <p className="no-groups">No groups yet</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="chat-layout">
-      {/* Notification */}
-      {notification && (
-        <div className={`notification notification-${notification.type}`}>
+    <div className="h-screen flex bg-gray-50 text-gray-800">
+      {notification ? (
+        <div
+          className={`fixed right-4 top-4 z-[70] rounded-lg border px-3 py-2 text-sm transition-all duration-200 ease-in-out ${
+            notification.type === "error"
+              ? "border-red-200 bg-red-50 text-red-700"
+              : notification.type === "info"
+                ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                : "border-green-200 bg-green-50 text-green-700"
+          }`}
+        >
           {notification.message}
         </div>
-      )}
+      ) : null}
 
-      {/* Sidebar */}
-      <div className="sidebar">
-        <div className="sidebar-header">
-          <h2>💬 Groups</h2>
-        </div>
+      {sidebarOpen ? (
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-gray-900/30 md:hidden"
+          aria-label="Close sidebar"
+        />
+      ) : null}
 
-        <div className="groups-list">
-          {groups.length > 0 ? (
-            groups.map((group) => (
-              <div
-                key={group._id}
-                className={`group-item ${room === group.name ? "active" : ""}`}
-                onClick={() => joinGroupFromSidebar(group.name)}
-              >
-                <div className="group-info">
-                  <p className="group-name">{group.name}</p>
-                  <span className="group-meta">{group.members.length} members</span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <p className="no-groups">No groups available</p>
-          )}
-        </div>
-      </div>
-
-      {/* Main Chat Area */}
-      <div className="chat-wrapper">
-        <div className="chat-header">
-          <h3>💬 {room}</h3>
-          <span>Welcome, {username}</span>
-        </div>
-
-        <div className="chat-messages">
-          {messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`chat-message ${
-                msg.author === username ? "my-message" : "other-message"
-              }`}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-gray-200 bg-white transition-all duration-200 ease-in-out md:static md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0 animate-sidebar-in" : "-translate-x-full"
+        } md:flex md:flex-col`}
+      >
+        <div className="border-b border-gray-200 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h1 className="text-xl font-semibold text-gray-900">CipherChat</h1>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-600 transition-all duration-200 ease-in-out hover:bg-gray-100"
             >
-              {msg.type === "system" ? (
-                <div className="system-message">{msg.content}</div>
-              ) : (
-                <div className="bubble">
-                  <p style={{ color: msg.usercolor }}>
-                    {msg.author === username ? "You" : msg.author}
-                  </p>
-                  {msg.messageType === "file" ? (
-                    <div className="file-message">
-                      <div className="file-info">
-                        <span className="file-icon">📄</span>
-                        <div className="file-details">
-                          <p className="file-name">{msg.fileName || msg.content}</p>
-                          <span className="file-size">{msg.fileSize || "0"} KB</span>
-                        </div>
-                      </div>
-                      <a 
-                        href={msg.fileUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="download-btn"
-                      >
-                        ⬇️ Download
-                      </a>
-                    </div>
-                  ) : (
-                    <div className="message-content">{msg.content}</div>
-                  )}
-                  <span className="message-time">
-                    {new Date(msg.timestamp).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                </div>
-              )}
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
+              Logout
+            </button>
+          </div>
+
+          <input
+            type="text"
+            placeholder="Search chats..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none transition-all duration-200 ease-in-out focus:border-indigo-600"
+          />
         </div>
 
-        {/* Input Section */}
-        <div className="input-footer">
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileSelect}
-            style={{ display: "none" }}
-          />
-
-          <div className="input-container">
+        <div className="border-b border-gray-200 p-4">
+          <p className="mb-2 text-xs text-gray-400">Join or create room</p>
+          <div className="flex gap-2">
             <input
               type="text"
-              className="message-input"
-              placeholder={selectedFile ? `Selected: ${selectedFile.name}` : "Type a message..."}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={uploading}
+              value={roomDraft}
+              onChange={(e) => setRoomDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && joinRoom()}
+              placeholder="room-name"
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none transition-all duration-200 ease-in-out focus:border-indigo-600"
             />
-
             <button
-              className="btn-upload"
-              onClick={() => fileInputRef.current?.click()}
-              title="Upload File"
-              disabled={uploading}
+              type="button"
+              onClick={() => joinRoom()}
+              className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-all duration-200 ease-in-out hover:bg-indigo-700"
             >
-              📎
-            </button>
-
-            <button
-              className={`btn-send ${uploading ? "uploading" : ""}`}
-              onClick={sendMessage}
-              title="Send Message"
-              disabled={uploading}
-            >
-              {uploading ? "⏳" : "✈️"}
+              Join
             </button>
           </div>
         </div>
-      </div>
+
+        <div className="flex-1 space-y-1 overflow-y-auto p-3">
+          {filteredGroups.length > 0 ? (
+            filteredGroups.map((group) => {
+              const active = room === group.name;
+              return (
+                <button
+                  type="button"
+                  key={group._id}
+                  onClick={() => joinRoom(group.name)}
+                  className={`w-full rounded-lg border px-3 py-2 text-left transition-all duration-200 ease-in-out ${
+                    active
+                      ? "border-indigo-200 bg-indigo-50 text-indigo-600"
+                      : "border-transparent text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  <p className="text-sm font-medium">{group.name}</p>
+                  <p className="text-xs text-gray-400">{group.members.length} members</p>
+                </button>
+              );
+            })
+          ) : (
+            <p className="px-2 text-sm text-gray-400">No chats found.</p>
+          )}
+        </div>
+      </aside>
+
+      <main className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 md:px-6">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="rounded-md border border-gray-200 p-2 text-gray-600 transition-all duration-200 ease-in-out hover:bg-gray-100 md:hidden"
+              aria-label="Open sidebar"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <div>
+              <p className="text-sm font-medium text-gray-900">{room || "Select a chat"}</p>
+              <p className="flex items-center gap-2 text-xs text-gray-400">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                {joined ? "Online" : "Not in a room"}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">{username}</p>
+        </header>
+
+        <section className="flex-1 space-y-4 overflow-y-auto p-6">
+          {!joined ? (
+            <div className="flex h-full items-center justify-center">
+              <p className="text-sm text-gray-400">Choose a room from the sidebar to start chatting.</p>
+            </div>
+          ) : (
+            messages.map((msg) => {
+              if (msg.type === "system") {
+                return (
+                  <div key={msg.id || `${msg.content}-${msg.timestamp}`} className="text-center text-xs text-gray-400">
+                    {msg.content}
+                  </div>
+                );
+              }
+
+              const isMine = msg.author === username;
+              return (
+                <div
+                  key={msg.id || `${msg.author}-${msg.timestamp}`}
+                  className={`flex animate-message-in ${isMine ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-md rounded-2xl px-4 py-3 ${
+                      isMine ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    <p className={`text-sm font-medium ${isMine ? "text-indigo-100" : "text-indigo-600"}`}>
+                      {isMine ? "You" : msg.author}
+                    </p>
+
+                    {msg.type === "file" ? (
+                      <div className="mt-1 space-y-2">
+                        <p className="text-sm font-normal">{msg.fileName || msg.content}</p>
+                        <a
+                          href={msg.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex rounded-md px-2 py-1 text-xs transition-all duration-200 ease-in-out ${
+                            isMine
+                              ? "bg-white/20 text-white hover:bg-white/30"
+                              : "bg-white text-gray-700 hover:bg-gray-50"
+                          }`}
+                        >
+                          Download
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-sm font-normal">{msg.content}</p>
+                    )}
+
+                    <p className={`mt-1 text-xs ${isMine ? "text-indigo-200" : "text-gray-400"}`}>
+                      {new Date(msg.timestamp).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+          )}
+          <div ref={messagesEndRef} />
+        </section>
+
+        <footer className="border-t border-gray-200 bg-white p-4">
+          <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" />
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+              disabled={uploading}
+              placeholder={selectedFile ? `Selected: ${selectedFile.name}` : "Type your message..."}
+              className="w-full rounded-full border border-gray-200 px-4 py-2 text-sm font-normal outline-none transition-all duration-200 ease-in-out focus:border-indigo-600"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="rounded-full border border-gray-200 px-4 py-2 text-sm text-gray-700 transition-all duration-200 ease-in-out hover:bg-gray-100 disabled:opacity-60"
+            >
+              File
+            </button>
+            <button
+              type="button"
+              onClick={sendMessage}
+              disabled={uploading}
+              className="rounded-full bg-indigo-600 px-5 py-2 text-sm font-medium text-white transition-all duration-200 ease-in-out hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {uploading ? "Sending..." : "Send"}
+            </button>
+          </div>
+        </footer>
+      </main>
     </div>
   );
 }

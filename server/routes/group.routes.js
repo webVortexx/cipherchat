@@ -16,7 +16,8 @@ router.get("/groups", async (req, res) => {
 // Create a new group
 router.post("/groups", async (req, res) => {
   try {
-    const { name, description, createdBy } = req.body;
+    const { name, description } = req.body;
+    const createdBy = req.user.username;
 
     const existingGroup = await Group.findOne({ name });
     if (existingGroup) {
@@ -41,7 +42,7 @@ router.post("/groups", async (req, res) => {
 router.post("/groups/:groupId/members", async (req, res) => {
   try {
     const { groupId } = req.params;
-    const { username } = req.body;
+    const username = req.user.username;
 
     const group = await Group.findByIdAndUpdate(
       groupId,

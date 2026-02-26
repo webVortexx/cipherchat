@@ -10,6 +10,8 @@ import Message from "./models/Message.js";
 import Group from "./models/Group.js";
 import uploadRoutes from "./routes/upload.routes.js";
 import groupRoutes from "./routes/group.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import { authenticateRequest, authenticateSocket } from "./middleware/auth.js";
 
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
@@ -17,40 +19,46 @@ dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
+const frontendOrigin = process.env.FRONTEND_ORIGIN || "http://localhost:5173";
 
-app.use(cors());
+app.use(
+  cors({
+    origin: frontendOrigin,
+  })
+);
 app.use(express.json());
-app.use("/api", uploadRoutes);
-app.use("/api", groupRoutes);
+app.use("/api", authRoutes);
+app.use("/api", authenticateRequest, uploadRoutes);
+app.use("/api", authenticateRequest, groupRoutes);
 
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: frontendOrigin,
     methods: ["GET", "POST"],
   },
 });
+io.use(authenticateSocket);
 
 const onlineUsers = {};
 
-// MongoDB Connection
 mongoose
   .connect(process.env.MONGODB_URI)
-  .then(() => console.log("✅ MongoDB Connected"))
+  .then(() => console.log("MongoDB Connected"))
   .catch((err) => {
-    console.error("❌ MongoDB Error:", err.message);
+    console.error("MongoDB Error:", err.message);
     process.exit(1);
   });
 
 io.on("connection", (socket) => {
-  console.log("✅ Socket connected:", socket.id);
+  console.log("Socket connected:", socket.id);
 
-  socket.on("join_room", async ({ username, room }) => {
+  socket.on("join_room", async ({ room }) => {
+    const username = socket.user?.username;
     if (!username || !room) return;
 
     socket.join(room);
     onlineUsers[socket.id] = { username, room };
 
-    // Create or get group
     let group = await Group.findOne({ name: room });
     if (!group) {
       group = new Group({
@@ -83,25 +91,25 @@ io.on("connection", (socket) => {
   });
 
   socket.on("send_message", async (data) => {
-    const { 
-      room, 
-      author, 
-      content, 
-      messageType = "text", 
-      fileUrl = null, 
+    const username = socket.user?.username;
+    const {
+      room,
+      content,
+      messageType = "text",
+      fileUrl = null,
       usercolor,
       fileName = null,
-      fileSize = null
+      fileSize = null,
     } = data;
 
-    if (!room || !author) return;
+    if (!room || !username) return;
     if (messageType === "text" && !content) return;
     if (messageType === "file" && !fileUrl) return;
 
     const message = {
       id: Date.now().toString(),
       room,
-      author,
+      author: username,
       content: content || null,
       fileName: fileName || null,
       fileSize: fileSize || null,
@@ -136,11 +144,11 @@ io.on("connection", (socket) => {
       delete onlineUsers[socket.id];
     }
 
-    console.log("❌ Disconnected:", socket.id);
+    console.log("Disconnected:", socket.id);
   });
 });
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`🚀 Server on port ${PORT}`);
+  console.log(`Server on port ${PORT}`);
 });
