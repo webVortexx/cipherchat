@@ -127,6 +127,35 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("delete_message", async ({ messageId, room }) => {
+    const username = socket.user?.username;
+    if (!messageId || !room || !username) return;
+
+    try {
+      const message = await Message.findById(messageId);
+      if (!message) {
+        socket.emit("message_delete_error", { error: "Message not found" });
+        return;
+      }
+
+      if (message.room !== room) {
+        socket.emit("message_delete_error", { error: "Invalid room context" });
+        return;
+      }
+
+      if (message.author !== username || message.type === "system") {
+        socket.emit("message_delete_error", { error: "Not allowed" });
+        return;
+      }
+
+      await Message.findByIdAndDelete(messageId);
+      io.to(room).emit("message_deleted", { messageId });
+    } catch (err) {
+      console.error("Delete message error:", err);
+      socket.emit("message_delete_error", { error: "Delete failed" });
+    }
+  });
+
   socket.on("disconnect", async () => {
     const user = onlineUsers[socket.id];
     if (user) {
