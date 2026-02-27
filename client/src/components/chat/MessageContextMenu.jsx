@@ -8,7 +8,7 @@ function MessageContextMenu({
 
   return (
     <div
-      className="fixed z-[90] min-w-36 origin-top-left rounded-lg border border-gray-200 bg-white p-1 shadow-sm transition-all duration-200 ease-in-out animate-context-menu"
+      className="context-menu fixed z-[90] min-w-36 origin-top-left rounded-xl p-1.5 transition-all duration-200 ease-in-out animate-context-menu"
       style={{ left: messageMenu.x, top: messageMenu.y }}
       onMouseDown={(e) => e.stopPropagation()}
     >
@@ -39,3 +39,4 @@ function MessageContextMenu({
 }
 
 export default MessageContextMenu;
+

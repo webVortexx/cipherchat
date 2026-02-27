@@ -8,7 +8,7 @@ function MessageList({ joined, messages, username, onOpenMessageMenu }) {
   }, [messages]);
 
   return (
-    <section className="flex-1 space-y-4 overflow-y-auto p-6">
+    <section className="premium-message-list flex-1 space-y-4 overflow-y-auto p-6">
       {!joined ? (
         <div className="flex h-full items-center justify-center">
           <p className="text-sm text-gray-400">Choose a room from the sidebar to start chatting.</p>
@@ -36,11 +36,11 @@ function MessageList({ joined, messages, username, onOpenMessageMenu }) {
             >
               <div
                 className={`relative max-w-md rounded-2xl px-4 py-3 ${
-                  isMine ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-800"
+                  isMine ? "bubble-own" : "bubble-other"
                 }`}
                 onContextMenu={(e) => onOpenMessageMenu(e, msg, isMine)}
               >
-                <p className={`text-sm font-medium ${isMine ? "text-indigo-100" : "text-indigo-600"}`}>
+                <p className={`text-sm font-semibold ${isMine ? "text-blue-100" : "text-blue-700"}`}>
                   {isMine ? "You" : msg.author}
                 </p>
 
@@ -81,3 +81,4 @@ function MessageList({ joined, messages, username, onOpenMessageMenu }) {
 }
 
 export default MessageList;
+

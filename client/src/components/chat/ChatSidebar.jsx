@@ -22,13 +22,13 @@ function ChatSidebar({
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 border-r border-gray-200 bg-white transition-all duration-200 ease-in-out md:static md:translate-x-0 ${
+        className={`premium-sidebar fixed inset-y-0 left-0 z-50 w-72 transition-all duration-200 ease-in-out md:static md:translate-x-0 ${
           sidebarOpen ? "translate-x-0 animate-sidebar-in" : "-translate-x-full"
         } md:flex md:flex-col`}
       >
-        <div className="border-b border-gray-200 p-4">
+        <div className="border-b border-gray-200 p-5">
           <div className="mb-3 flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-gray-900">CipherChat</h1>
+            <h1 className="premium-title text-3xl font-semibold text-gray-900">CipherChat</h1>
             <button
               type="button"
               onClick={handleLogout}
@@ -55,12 +55,12 @@ function ChatSidebar({
               placeholder="Search chats..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm outline-none transition-all duration-200 ease-in-out focus:border-indigo-600"
+              className="premium-input w-full rounded-xl py-2.5 pl-9 pr-3 text-sm text-gray-700 outline-none"
             />
           </div>
         </div>
 
-        <div className="border-b border-gray-200 p-4">
+        <div className="border-b border-gray-200 p-5">
           <p className="mb-2 text-xs text-gray-400">Join or create room</p>
           <div className="flex gap-2">
             <input
@@ -69,12 +69,12 @@ function ChatSidebar({
               onChange={(e) => setRoomDraft(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && joinRoom()}
               placeholder="room-name"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none transition-all duration-200 ease-in-out focus:border-indigo-600"
+              className="premium-input w-full rounded-xl px-3 py-2 text-sm text-gray-700 outline-none"
             />
             <button
               type="button"
               onClick={() => joinRoom()}
-              className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-all duration-200 ease-in-out hover:bg-indigo-700"
+              className="premium-button inline-flex items-center gap-1 rounded-xl px-3 py-2 text-sm font-semibold text-white"
             >
               <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M12 5l7 7-7 7" />
@@ -115,3 +115,4 @@ function ChatSidebar({
 }
 
 export default ChatSidebar;
+

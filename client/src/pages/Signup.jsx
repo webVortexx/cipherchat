@@ -41,9 +41,9 @@ function Signup() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <form onSubmit={handleSignup} className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6">
-        <h1 className="text-xl font-semibold text-gray-900">Create account</h1>
+    <div className="premium-shell flex min-h-screen items-center justify-center p-4">
+      <form onSubmit={handleSignup} className="premium-auth-card w-full max-w-sm rounded-3xl p-7">
+        <h1 className="premium-title text-2xl font-semibold text-gray-900">Create account</h1>
         <p className="mt-1 text-sm text-gray-500">Start chatting in seconds.</p>
 
         <div className="mt-5 space-y-3">
@@ -52,28 +52,28 @@ function Signup() {
             placeholder="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition-all duration-200 ease-in-out focus:border-indigo-600"
+            className="premium-input w-full rounded-xl px-3 py-2 text-sm text-gray-700 outline-none"
           />
           <input
             type="email"
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition-all duration-200 ease-in-out focus:border-indigo-600"
+            className="premium-input w-full rounded-xl px-3 py-2 text-sm text-gray-700 outline-none"
           />
           <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition-all duration-200 ease-in-out focus:border-indigo-600"
+            className="premium-input w-full rounded-xl px-3 py-2 text-sm text-gray-700 outline-none"
           />
           <input
             type="password"
             placeholder="Confirm password"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm outline-none transition-all duration-200 ease-in-out focus:border-indigo-600"
+            className="premium-input w-full rounded-xl px-3 py-2 text-sm text-gray-700 outline-none"
           />
         </div>
 
@@ -82,7 +82,7 @@ function Signup() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-all duration-200 ease-in-out hover:bg-indigo-700 disabled:opacity-60"
+          className="premium-button mt-4 w-full rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
         >
           {loading ? "Creating account..." : "Sign up"}
         </button>
@@ -99,3 +99,4 @@ function Signup() {
 }
 
 export default Signup;
+

@@ -39,7 +39,7 @@ function Chat() {
   } = useChatController();
 
   return (
-    <div className="h-screen flex bg-gray-50 text-gray-800">
+    <div className="premium-shell h-screen flex text-gray-800">
       <NotificationToast notification={notification} />
 
       <MessageContextMenu
@@ -62,7 +62,7 @@ function Chat() {
         room={room}
       />
 
-      <main className="flex min-w-0 flex-1 flex-col">
+      <main className="premium-main flex min-w-0 flex-1 flex-col">
         <ChatHeader
           room={room}
           joined={joined}
@@ -94,3 +94,4 @@ function Chat() {
 }
 
 export default Chat;
+

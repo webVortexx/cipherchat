@@ -1,6 +1,6 @@
 function ChatHeader({ room, joined, activeGroup, username, openSidebar }) {
   return (
-    <header className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 md:px-6">
+    <header className="premium-header flex items-center justify-between px-5 py-4 md:px-7">
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -13,7 +13,7 @@ function ChatHeader({ room, joined, activeGroup, username, openSidebar }) {
           </svg>
         </button>
         <div>
-          <p className="text-sm font-medium text-gray-900">{room || "Select a chat"}</p>
+          <p className="premium-title text-base font-semibold text-gray-900">{room || "Select a chat"}</p>
           <p className="flex items-center gap-2 text-xs text-gray-400">
             <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
             {joined
@@ -22,9 +22,11 @@ function ChatHeader({ room, joined, activeGroup, username, openSidebar }) {
           </p>
         </div>
       </div>
-      <p className="text-xs text-gray-400">{username}</p>
+      <p className="premium-chip px-2.5 py-1 text-xs text-gray-500">{username}</p>
     </header>
   );
 }
 
 export default ChatHeader;
+
+
