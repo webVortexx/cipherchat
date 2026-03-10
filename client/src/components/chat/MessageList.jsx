@@ -10,9 +10,13 @@ function MessageList({ joined, messages, username, onOpenMessageMenu }) {
   return (
     <section className="premium-message-list flex-1 space-y-4 overflow-y-auto p-6">
       {!joined ? (
-        <div className="flex h-full items-center justify-center">
-          <p className="text-sm text-gray-400">Choose a room from the sidebar to start chatting.</p>
+        <div className="flex flex-col h-full items-center justify-center">
+          <p className="premium-title text-2xl font-semibold text-gray-900">Welcome to Cipher chat</p>
+          <br/>  
+            <p className=" flex premium-title text-xl font-semibold text-gray-900">Please join a group to start chatting ;)</p>
+      
         </div>
+        
       ) : messages.length === 0 ? (
         <div className="flex h-full items-center justify-center">
           <p className="text-sm text-gray-400">No messages yet. Start the conversation.</p>
