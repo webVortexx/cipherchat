@@ -17,6 +17,7 @@ export default function useChatController() {
   const [notification, setNotification] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [internetConnected, setInternetConnected] = useState(true);
   const [messageMenu, setMessageMenu] = useState({
     open: false,
     x: 0,
@@ -67,12 +68,15 @@ export default function useChatController() {
     try {
       const response = await API.get("/api/groups");
       setGroups(response.data);
+       setInternetConnected(true);
     } catch (error) {
       if (error.response?.status === 401) {
         handleUnauthorized();
         return;
       }
+
       showNotification("Failed to load chat list", "error");
+      setInternetConnected(false);
     }
   }, [handleUnauthorized, showNotification]);
 
@@ -322,6 +326,7 @@ export default function useChatController() {
 
   return {
     username,
+    internetConnected,
     room,
     roomDraft,
     search,

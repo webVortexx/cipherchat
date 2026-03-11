@@ -12,6 +12,7 @@ function Chat() {
     room,
     roomDraft,
     search,
+    internetConnected,
     message,
     messages,
     joined,
@@ -73,6 +74,7 @@ function Chat() {
 
         <MessageList
           joined={joined}
+          internetConnected={internetConnected}
           messages={messages}
           username={username}
           onOpenMessageMenu={openMessageMenu}

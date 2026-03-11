@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-function MessageList({ joined, messages, username, onOpenMessageMenu }) {
+function MessageList({ joined,internetConnected, messages, username, onOpenMessageMenu }) {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -10,6 +10,19 @@ function MessageList({ joined, messages, username, onOpenMessageMenu }) {
   return (
     <section className="premium-message-list flex-1 space-y-4 overflow-y-auto p-6">
       {!joined ? (
+        !internetConnected?(
+                      
+        <div className="flex flex-col h-full items-center justify-center">
+          <p className="premium-title text-3xl font-semibold text-gray-900">Welcome to Cipher chat</p>
+          <br/>  
+            <p className=" flex premium-title text-2xl font-semibold text-gray-900">poh ! No Internet please try again after some time</p>
+          <br/>
+            <img src="/nointernet.jpg" alt="home" className="h-64 my-4" />
+      
+        </div>
+
+        ):(
+            
         <div className="flex flex-col h-full items-center justify-center">
           <p className="premium-title text-3xl font-semibold text-gray-900">Welcome to Cipher chat</p>
           <br/>  
@@ -18,8 +31,10 @@ function MessageList({ joined, messages, username, onOpenMessageMenu }) {
             <img src="/chathome.jpg" alt="home" className="h-64 my-4" />
       
         </div>
+        )
+
         
-        
+            
       ) : messages.length === 0 ? (
         
         <div className="flex h-full items-center justify-center">
