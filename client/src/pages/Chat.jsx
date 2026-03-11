@@ -79,6 +79,7 @@ function Chat() {
         />
 
         <ChatComposer
+          joined={joined}
           selectedFile={selectedFile}
           setSelectedFile={setSelectedFile}
           handleFileSelect={handleFileSelect}

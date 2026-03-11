@@ -22,7 +22,7 @@ function ChatSidebar({
       ) : null}
 
       <aside
-        className={`premium-sidebar fixed inset-y-0 left-0 z-50 w-72 transition-all duration-200 ease-in-out md:static md:translate-x-0 ${
+        className={`premium-sidebar fixed inset-y-0 left-0 z-50 w-120 transition-all duration-200 ease-in-out md:static md:translate-x-0 ${
           sidebarOpen ? "translate-x-0 animate-sidebar-in" : "-translate-x-full"
         } md:flex md:flex-col`}
       >
@@ -100,8 +100,8 @@ function ChatSidebar({
                       : "border-transparent text-gray-700 hover:bg-gray-100"
                   } animate-chat-item`}
                 >
-                  <p className="text-sm font-medium">{group.name}</p>
-                  <p className="text-xs text-gray-400">{group.members.length} members</p>
+                  <p className="text-md font-bold">{group.name}</p>
+                  <p className="text-xs text-gray-400">{group.members.length} members joined</p>
                 </button>
               );
             })

@@ -1,4 +1,7 @@
 function ChatHeader({ room, joined, activeGroup, username, openSidebar }) {
+  if (!joined) {
+      return <div></div>;
+  }
   return (
     <header className="premium-header flex items-center justify-between px-5 py-4 md:px-7">
       <div className="flex items-center gap-3">
